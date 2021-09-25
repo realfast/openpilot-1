@@ -114,26 +114,26 @@ class CarState(CarStateBase):
     # print(f"frame time: {now_time - self.monitor_last_sec}")
 
     change = False
-    if self.monitor_frame == self.frame:
-      print(f"Same frame: {now_time - self.monitor_frame_sec}")
-    else:
-      if self.monitor_frame + 1 != self.frame:
-        print(f"Lost frame: {now_time - self.monitor_frame_sec}")
+    if self.monitor_frame != self.frame:
+      change = True
+      next = (self.monitor_frame + 1) % 16
+      if next != self.frame:
+        print(f"Lost eps frame: {self.frame} vs {next} @ {now_time - self.monitor_frame_sec}")
       self.monitor_frame_sec = now_time
-      change = True
-    self.monitor_frame = self.frame
+      self.monitor_frame = self.frame
 
-    if self.monitor_lkas_counter == self.lkas_counter:
-      print(f"Same frame: {now_time - self.monitor_lkas_sec}")
-    else:
-      if self.monitor_lkas_counter + 1 != self.lkas_counter:
-        print(f"Lost frame: {now_time - self.monitor_lkas_sec}")
+    if self.monitor_lkas_counter != self.lkas_counter:
+      change = True
+      next = (self.monitor_lkas_counter + 1) % 16
+      if next != self.lkas_counter:
+        print(f"Lost lkas frame: {self.lkas_counter} vs {next} @ {now_time - self.monitor_lkas_sec}")
       self.monitor_lkas_sec = now_time
-      change = True
-    self.monitor_lkas_counter = self.lkas_counter
+      self.monitor_lkas_counter = self.lkas_counter
 
-    if not change:
-      print("No Change!")
+    if now_time - self.monitor_last_sec >= 0.01:
+      if not change:
+        print("No Change!")
+    self.monitor_last_sec = now_time
 
     # if self.monitor_button_counter == out.jvePilotCarState.buttonCounter:
     #   print(f"Same frame: {now_time - self.monitor_lkas_sec}")
@@ -218,7 +218,7 @@ class CarState(CarStateBase):
     checks = [
       # sig_address, frequency
       ("BRAKE_2", 50),
-      ("EPS_STATUS", 100),
+      ("EPS_STATUS", 200),
       ("SPEED_1", 100),
       ("WHEEL_SPEEDS", 50),
       ("STEERING", 100),
@@ -262,7 +262,7 @@ class CarState(CarStateBase):
     ] + forward_lkas_heartbit_signals
 
     checks = [
-      ("LKAS_COMMAND", 100),
+      ("LKAS_COMMAND", 200),
       ("LKAS_HUD", 4),
       ("LKAS_HEARTBIT", 10),
     ]

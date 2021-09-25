@@ -145,6 +145,7 @@ class Controls:
     self.mismatch_counter = 0
     self.can_error_counter = 0
     self.last_blinker_frame = 0
+    self.last_blinker_frame = 0
     self.saturated_count = 0
     self.distance_traveled = 0
     self.last_functional_fan_frame = 0
@@ -182,7 +183,7 @@ class Controls:
       self.startup_event = None
 
     # controlsd is driven by can recv, expected at 100Hz
-    self.rk = Ratekeeper(100, print_delay_threshold=None)
+    self.rk = Ratekeeper(200, print_delay_threshold=None)
     self.prof = Profiler(False)  # off by default
 
   def update_events(self, CS):
