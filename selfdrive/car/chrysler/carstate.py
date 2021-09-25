@@ -6,6 +6,7 @@ from selfdrive.car.interfaces import CarStateBase
 from selfdrive.car.chrysler.values import DBC, STEER_THRESHOLD
 from common.cached_params import CachedParams
 from common.op_params import opParams
+from common.realtime import sec_since_boot
 
 ButtonType = car.CarState.ButtonEvent.Type
 
@@ -29,6 +30,14 @@ class CarState(CarStateBase):
     self.cachedParams = CachedParams()
     self.opParams = opParams()
     self.lkasHeartbit = None
+
+    self.monitor_last_sec = sec_since_boot()
+    self.monitor_frame = -1
+    self.monitor_frame_sec = self.monitor_last_sec
+    self.monitor_lkas_counter = -1
+    self.monitor_lkas_sec = self.monitor_last_sec
+    self.monitor_button_counter = -1
+    self.monitor_button_sec = self.monitor_last_sec
 
   def update(self, cp, cp_cam):
     min_steer_check = self.opParams.get('steer.checkMinimum')
@@ -96,7 +105,44 @@ class CarState(CarStateBase):
       self.check_button(button_events, buttonType, bool(cp.vl[CHECK_BUTTONS[buttonType][0]][CHECK_BUTTONS[buttonType][1]]))
     ret.buttonEvents = button_events
 
+    self.monitor(ret)
+
     return ret
+
+  def monitor(self, out):
+    now_time = sec_since_boot()
+    # print(f"frame time: {now_time - self.monitor_last_sec}")
+
+    change = False
+    if self.monitor_frame == self.frame:
+      print(f"Same frame: {now_time - self.monitor_frame_sec}")
+    else:
+      if self.monitor_frame + 1 != self.frame:
+        print(f"Lost frame: {now_time - self.monitor_frame_sec}")
+      self.monitor_frame_sec = now_time
+      change = True
+    self.monitor_frame = self.frame
+
+    if self.monitor_lkas_counter == self.lkas_counter:
+      print(f"Same frame: {now_time - self.monitor_lkas_sec}")
+    else:
+      if self.monitor_lkas_counter + 1 != self.lkas_counter:
+        print(f"Lost frame: {now_time - self.monitor_lkas_sec}")
+      self.monitor_lkas_sec = now_time
+      change = True
+    self.monitor_lkas_counter = self.lkas_counter
+
+    if not change:
+      print("No Change!")
+
+    # if self.monitor_button_counter == out.jvePilotCarState.buttonCounter:
+    #   print(f"Same frame: {now_time - self.monitor_lkas_sec}")
+    # else:
+    #   if (self.monitor_lkas_counter + 1 != self.frame):
+    #     print(f"Lost frame: {now_time - self.monitor_lkas_sec}")
+    #   self.monitor_lkas_sec = now_time
+    # self.monitor_button_counter = out.jvePilotCarState.buttonCounter
+
 
   def check_button(self, button_events, button_type, pressed):
     pressed_frames = 0
