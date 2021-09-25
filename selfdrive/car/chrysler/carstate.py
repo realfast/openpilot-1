@@ -38,6 +38,7 @@ class CarState(CarStateBase):
     self.monitor_lkas_sec = self.monitor_last_sec
     self.monitor_button_counter = -1
     self.monitor_button_sec = self.monitor_last_sec
+    self.monitor_button_change_frame = -1
 
   def update(self, cp, cp_cam):
     min_steer_check = self.opParams.get('steer.checkMinimum')
@@ -113,9 +114,7 @@ class CarState(CarStateBase):
     now_time = sec_since_boot()
     # print(f"frame time: {now_time - self.monitor_last_sec}")
 
-    change = False
     if self.monitor_frame != self.frame:
-      change = True
       next = (self.monitor_frame + 1) % 16
       if next != self.frame:
         print(f"Lost eps frame: {self.frame} vs {next} @ {now_time - self.monitor_frame_sec}")
@@ -123,25 +122,18 @@ class CarState(CarStateBase):
       self.monitor_frame = self.frame
 
     if self.monitor_lkas_counter != self.lkas_counter:
-      change = True
       next = (self.monitor_lkas_counter + 1) % 16
       if next != self.lkas_counter:
         print(f"Lost lkas frame: {self.lkas_counter} vs {next} @ {now_time - self.monitor_lkas_sec}")
       self.monitor_lkas_sec = now_time
       self.monitor_lkas_counter = self.lkas_counter
 
-    if now_time - self.monitor_last_sec >= 0.01:
-      if not change:
-        print("No Change!")
-    self.monitor_last_sec = now_time
-
-    # if self.monitor_button_counter == out.jvePilotCarState.buttonCounter:
-    #   print(f"Same frame: {now_time - self.monitor_lkas_sec}")
-    # else:
-    #   if (self.monitor_lkas_counter + 1 != self.frame):
-    #     print(f"Lost frame: {now_time - self.monitor_lkas_sec}")
-    #   self.monitor_lkas_sec = now_time
-    # self.monitor_button_counter = out.jvePilotCarState.buttonCounter
+    if self.monitor_button_counter != out.jvePilotCarState.buttonCounter:
+      next = (self.monitor_button_counter + 1) % 16
+      if next != out.jvePilotCarState.buttonCounter:
+        print(f"Lost button frame: {out.jvePilotCarState.buttonCounter} vs {next} @ {now_time - self.monitor_button_sec}")
+      self.monitor_button_sec = now_time
+      self.monitor_button_counter = out.jvePilotCarState.buttonCounter
 
 
   def check_button(self, button_events, button_type, pressed):
@@ -218,7 +210,7 @@ class CarState(CarStateBase):
     checks = [
       # sig_address, frequency
       ("BRAKE_2", 50),
-      ("EPS_STATUS", 200),
+      ("EPS_STATUS", 100),
       ("SPEED_1", 100),
       ("WHEEL_SPEEDS", 50),
       ("STEERING", 100),
@@ -262,7 +254,7 @@ class CarState(CarStateBase):
     ] + forward_lkas_heartbit_signals
 
     checks = [
-      ("LKAS_COMMAND", 200),
+      ("LKAS_COMMAND", 100),
       ("LKAS_HUD", 4),
       ("LKAS_HEARTBIT", 10),
     ]
