@@ -65,9 +65,6 @@ class CarController():
       return
     self.last_acc_counter = CS.acc_2["COUNTER"]
 
-    if self.last_acc_counter % 2 == 0:
-      return
-
     if enabled and CS.out.standstill and CS.acc_2["ACC_STOP"] and CS.acc_2["ACC_ENABLED"]:
       can_sends.append(acc_stop_fix(self.packer, self.last_acc_counter + 1, CS.acc_2))
 
