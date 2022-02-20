@@ -69,6 +69,8 @@ def acc_stop_fix(packer, counter, acc_2):
   values = acc_2.copy()  # forward what we parsed
 
   values['ACC_STOP'] = 0
+  flux = counter / -50.  # flux the brake while stopped
+  values['ACC_DECEL'] = values['ACC_DECEL'] + flux
   values['COUNTER'] = counter % 0x10
 
   return packer.make_can_msg("ACC_2", 0, values)
