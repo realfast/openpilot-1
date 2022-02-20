@@ -1,7 +1,7 @@
 from cereal import car
 from selfdrive.car import apply_toyota_steer_torque_limits
 from selfdrive.car.chrysler.chryslercan import create_lkas_hud, create_lkas_command, \
-                                               create_wheel_buttons_command, create_lkas_heartbit
+                                               create_wheel_buttons_command, create_lkas_heartbit, acc_stop_fix
 from selfdrive.car.chrysler.values import CAR, CarControllerParams
 from opendbc.can.packer import CANPacker
 from selfdrive.config import Conversions as CV
@@ -32,6 +32,7 @@ class CarController():
     self.steer_rate_limited = False
     self.last_button_counter = -1
     self.button_frame = -1
+    self.last_acc_counter = -1
 
     self.packer = CANPacker(dbc_name)
 
@@ -55,8 +56,20 @@ class CarController():
     can_sends = []
     actuators = self.lkas_control(CS, actuators, can_sends, enabled, hud_alert, c.jvePilotState)
     self.wheel_button_control(CS, can_sends, enabled, gas_resume_speed, c.jvePilotState, pcm_cancel_cmd)
+    self.acc_stop_fix(CS, can_sends, enabled)
 
     return actuators, can_sends
+
+  def acc_stop_fix(self, CS, can_sends, enabled):
+    if CS.acc_2["COUNTER"] == self.last_acc_counter:
+      return
+    self.last_acc_counter = CS.acc_2["COUNTER"]
+
+    if self.last_acc_counter % 2 == 0:
+      return
+
+    if enabled and CS.out.standstill and CS.acc_2["ACC_STOP"] and CS.acc_2["ACC_ENABLED"]:
+      can_sends.append(acc_stop_fix(self.packer, self.last_acc_counter + 1, CS.acc_2))
 
   def lkas_control(self, CS, actuators, can_sends, enabled, hud_alert, jvepilot_state):
     if self.prev_frame == CS.frame:

@@ -32,6 +32,7 @@ class CarState(CarStateBase):
     self.lkasHeartbit = None
     self.dashboard = None
     self.speedRequested = 0
+    self.acc_2 = None
 
   def update(self, cp, cp_cam):
     min_steer_check = self.opParams.get('steer.checkMinimum')
@@ -92,6 +93,7 @@ class CarState(CarStateBase):
     self.lkas_counter = cp_cam.vl["LKAS_COMMAND"]["COUNTER"]
     self.lkas_car_model = cp_cam.vl["LKAS_HUD"]["CAR_MODEL"]
     self.torq_status = cp.vl["EPS_STATUS"]["TORQ_STATUS"]
+    self.acc_2 = cp.vl['ACC_2']
 
     brake = cp.vl["BRAKE_1"]["BRAKE_VAL_TOTAL"]
     gas = cp.vl["ACCEL_RELATED_120"]["ACCEL"]
@@ -184,6 +186,23 @@ class CarState(CarStateBase):
       ("VEHICLE_SPEED_KPH", "BRAKE_1"),
       ("BRAKE_VAL_TOTAL", "BRAKE_1"),
       ("ACCEL", "ACCEL_RELATED_120"),
+
+      ("ACC_STOP", "ACC_2", 0),
+      ("ACC_GO", "ACC_2", 0),
+      ("ACC_TORQ", "ACC_2", 0),
+      ("ACC_TORQ_REQ", "ACC_2", 0),
+      ("ACC_DECEL", "ACC_2", 0),
+      ("ACC_DECEL_REQ", "ACC_2", 0),
+      ("ACC_AVAILABLE", "ACC_2", 0),
+      ("ACC_ENABLED", "ACC_2", 0),
+      ("DISABLE_FUEL_SHUTOFF", "ACC_2", 0),
+      ("GR_MAX_REQ", "ACC_2", 0),
+      ("STS", "ACC_2", 0),
+      ("COLLISION_BRK_PREP", "ACC_2", 0),
+      ("ACC_BRK_PREP", "ACC_2", 0),
+      ("DISPLAY_REQ", "ACC_2", 0),
+      ("COUNTER", "ACC_2", 0),
+      ("CHECKSUM", "ACC_2", 0),
     ]
 
     checks = [
