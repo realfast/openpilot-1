@@ -124,6 +124,8 @@ class CarState(CarStateBase):
         #ret.cruiseState.speedOffset = ret.cruiseState.speed - ret.vEgo   
   
       self.longEnabled = False
+      
+    self.lkas_active = cp.vl["EPS_2"]["LKAS_ACTIVE"] == 1
 
     if self.CP.carFingerprint in (CAR.PACIFICA_2017_HYBRID, CAR.PACIFICA_2018_HYBRID, CAR.PACIFICA_2019_HYBRID, CAR.PACIFICA_2018, CAR.PACIFICA_2020, CAR.JEEP_CHEROKEE_2019, CAR.JEEP_CHEROKEE):
       self.cruise_error = cp.vl["DAS_3"]["Status"] != 0
@@ -145,7 +147,7 @@ class CarState(CarStateBase):
       self.acc_2 = cp_cam.vl['DAS_3']
       ret.jvePilotCarState.accFollowDistance = int(min(3, max(0, cp_cam.vl["DAS_4"]['ACC_DISTANCE_CONFIG_2'])))
 
-    self.lkas_active = cp.vl["EPS_2"]["LKAS_ACTIVE"] == 1
+    
 
     # blindspot sensors
     if self.CP.enableBsm:
@@ -315,6 +317,7 @@ class CarState(CarStateBase):
         ("ACC_STOP", "DAS_3",0),#ACC Engaged
         ("Status", "DAS_3",0),
         ("ACC_TORQ", "DAS_3",0),
+        ("COUNTER", "DAS_3", 0),
         ("ACC_Set_Speed", "DAS_4",0),
         ("ACC_Activation_Status", "DAS_4",0),
         ("ACC_DISTANCE_CONFIG_2", "DAS_4",0),
