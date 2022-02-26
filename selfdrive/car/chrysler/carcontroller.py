@@ -64,6 +64,9 @@ class CarController():
     self.torq_adjust = 0.
     self.under_accel_frame_count = 0
     self.ccframe = 0
+    self.torq_enabled_previous = 0
+    self.lkaslast_frame = 0
+
     self.hybrid = self.car_fingerprint in (CAR.PACIFICA_2017_HYBRID, CAR.PACIFICA_2018_HYBRID, CAR.PACIFICA_2019_HYBRID)
 
     self.packer = CANPacker(dbc_name)
@@ -289,6 +292,12 @@ class CarController():
         self.torq_enabled = True
       elif CS.out.vEgo < (CS.CP.minSteerSpeed - 3.0):
         self.torq_enabled = False  # < 14.5m/s stock turns off this bit, but fine down to 13.5
+
+    if self.torq_enabled_previous == True and self.torq_enabled == False:
+        self.lkaslast_frame = self.ccframe
+
+    if (CS.out.steerError is True) or (self.ccframe-self.lkaslast_frame<400):#If the LKAS Control bit is toggled too fast it can create and LKAS error
+      self.torq_enabled = False
 
     lkas_active = self.moving_fast and enabled
     if not lkas_active:
