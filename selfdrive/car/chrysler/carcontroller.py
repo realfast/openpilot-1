@@ -1,8 +1,9 @@
 from cereal import car
 from selfdrive.car import apply_toyota_steer_torque_limits
 from selfdrive.car.chrysler.chryslercan import create_lkas_hud, create_lkas_command, \
-                                               create_wheel_buttons_command, create_lkas_heartbit
-from selfdrive.car.chrysler.values import CAR, CarControllerParams
+  create_wheel_buttons_command
+from selfdrive.car.chrysler.values import CAR, CarControllerParams, STEER_MAX_LOOKUP, STEER_DELTA_UP, STEER_DELTA_DOWN
+from selfdrive.car.chrysler.interface import CarInterface
 from opendbc.can.packer import CANPacker
 from selfdrive.config import Conversions as CV
 
@@ -23,12 +24,15 @@ ACC_BRAKE_THRESHOLD = 2 * CV.MPH_TO_MS
 class CarController():
   def __init__(self, dbc_name, CP, VM):
     self.apply_steer_last = 0
+    self.ccframe = 0
     self.prev_frame = -1
     self.lkas_frame = -1
     self.prev_lkas_counter = -1
     self.hud_count = 0
     self.car_fingerprint = CP.carFingerprint
     self.torq_enabled = False
+    self.lkaslast_frame = 0
+    self.torq_enabled_previous = 0
     self.steer_rate_limited = False
     self.last_button_counter = -1
     self.button_frame = -1
@@ -44,8 +48,12 @@ class CarController():
     self.autoFollowDistanceLock = None
     self.moving_fast = False
     self.min_steer_check = self.opParams.get("steer.checkMinimum")
+    CarControllerParams.STEER_MAX = STEER_MAX_LOOKUP.get(CP.carFingerprint, 1.)
+    CarControllerParams.STEER_DELTA_UP = STEER_DELTA_UP.get(CP.carFingerprint, 1.) 
+    CarControllerParams.STEER_DELTA_DOWN = STEER_DELTA_DOWN.get(CP.carFingerprint, 1.) 
 
   def update(self, enabled, CS, actuators, pcm_cancel_cmd, hud_alert, gas_resume_speed, c):
+    self.ccframe += 1
     if CS.button_pressed(ButtonType.lkasToggle, False):
       c.jvePilotState.carControl.useLaneLines = not c.jvePilotState.carControl.useLaneLines
       self.params.put("EndToEndToggle", "0" if c.jvePilotState.carControl.useLaneLines else "1")
@@ -82,6 +90,12 @@ class CarController():
     elif low_steer_models:
       self.moving_fast = not CS.out.steerError and CS.lkas_active
       self.torq_enabled = self.torq_enabled or CS.torq_status > 1
+    elif self.car_fingerprint in (CAR.RAM_1500, CAR.RAM_2500):
+      self.moving_fast = CS.out.vEgo > CS.CP.minSteerSpeed  # for status message
+      if CS.out.vEgo > (CS.CP.minSteerSpeed):  # for command high bit
+        self.torq_enabled = True
+      elif CS.out.vEgo < (CS.CP.minSteerSpeed - 0.5):
+        self.torq_enabled = False 
     else:
       self.moving_fast = CS.out.vEgo > CS.CP.minSteerSpeed  # for status message
       if CS.out.vEgo > (CS.CP.minSteerSpeed - 0.5):  # for command high bit
@@ -89,21 +103,24 @@ class CarController():
       elif CS.out.vEgo < (CS.CP.minSteerSpeed - 3.0):
         self.torq_enabled = False  # < 14.5m/s stock turns off this bit, but fine down to 13.5
 
+    if self.torq_enabled_previous == True and self.torq_enabled == False:
+        self.lkaslast_frame = self.ccframe
+    if (CS.out.steerError is True) or (self.ccframe-self.lkaslast_frame<400):#If the LKAS Control bit is toggled too fast it can create and LKAS error
+      self.torq_enabled = False
+
     lkas_active = self.moving_fast and enabled
     if not lkas_active:
       apply_steer = 0
 
     self.apply_steer_last = apply_steer
 
-    if self.lkas_frame % 10 == 0:  # 0.1s period
-      new_msg = create_lkas_heartbit(self.packer, 0 if jvepilot_state.carControl.useLaneLines else 1, CS.lkasHeartbit)
-      can_sends.append(new_msg)
+    #if self.lkas_frame % 10 == 0:  # 0.1s period
+      #new_msg = create_lkas_heartbit(self.packer, 0 if jvepilot_state.carControl.useLaneLines else 1, CS.lkasHeartbit)
+      #can_sends.append(new_msg)
 
     if self.lkas_frame % 25 == 0:  # 0.25s period
       if CS.lkas_car_model != -1:
-        new_msg = create_lkas_hud(
-          self.packer, CS.out.gearShifter, lkas_active, hud_alert,
-          self.hud_count, CS.lkas_car_model)
+        new_msg = create_lkas_hud(self.packer, lkas_active, hud_alert, self.hud_count, CS, self.car_fingerprint)
         can_sends.append(new_msg)
         self.hud_count += 1
 
@@ -125,7 +142,7 @@ class CarController():
     button_counter_offset = 1
     buttons_to_press = []
     if pcm_cancel_cmd:
-      buttons_to_press = ['ACC_CANCEL']
+      buttons_to_press = ['ACC_Cancel']
     elif not CS.button_pressed(ButtonType.cancel):
       follow_inc_button = CS.button_pressed(ButtonType.followInc)
       follow_dec_button = CS.button_pressed(ButtonType.followDec)
@@ -152,12 +169,12 @@ class CarController():
 
     buttons_to_press = list(filter(None, buttons_to_press))
     if buttons_to_press is not None and len(buttons_to_press) > 0:
-      new_msg = create_wheel_buttons_command(self.packer, button_counter + button_counter_offset, buttons_to_press)
+      new_msg = create_wheel_buttons_command(self.packer, button_counter + button_counter_offset, buttons_to_press, self.car_fingerprint)
       can_sends.append(new_msg)
 
   def auto_resume_button(self, CS, gas_resume_speed):
     if self.auto_resume and CS.out.vEgo <= gas_resume_speed:  # Keep trying while under gas_resume_speed
-      return 'ACC_RESUME'
+      return 'ACC_Resume'
 
   def hybrid_acc_button(self, CS, jvepilot_state):
     target = jvepilot_state.carControl.vTargetFuture + 2 * CV.MPH_TO_MS  # add extra speed so ACC does the limiting
@@ -182,9 +199,9 @@ class CarController():
     current = round(CS.out.cruiseState.speed * self.round_to_unit)
 
     if target < current and current > self.minAccSetting:
-      return 'ACC_SPEED_DEC'
+      return 'ACC_Decel'
     elif target > current:
-      return 'ACC_SPEED_INC'
+      return 'ACC_Accel'
 
   def auto_follow_button(self, CS, jvepilot_state):
     if jvepilot_state.carControl.autoFollow:
@@ -209,6 +226,6 @@ class CarController():
         self.autoFollowDistanceLock = target_follow  # going from close to far, use upperbound
 
         if jvepilot_state.carState.accFollowDistance > target_follow:
-          return 'ACC_FOLLOW_DEC'
+          return 'ACC_Distance_Dec'
         else:
-          return 'ACC_FOLLOW_INC'
+          return 'ACC_Distance_Inc'
